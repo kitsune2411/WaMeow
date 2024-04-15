@@ -9,6 +9,9 @@ import (
 	"syscall"
 
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/mdp/qrterminal/v3"
+
 	"google.golang.org/protobuf/proto"
 
 	"go.mau.fi/whatsmeow"
@@ -55,17 +58,42 @@ func eventHandler(evt interface{}) {
 				Server: v.Info.Sender.Server,
 				User:   v.Info.Sender.User,
 			}
-			if strings.Contains(textwa, "ini") {
-				client.SendMessage(context.Background(), targetJID, &waProto.Message{
-					// Conversation: proto.String("Hello, World!"),
-					Conversation: proto.String("halo " + v.Info.PushName + ", apa ini ?"),
-				})
-			} else {
 
-				client.SendMessage(context.Background(), targetJID, &waProto.Message{
-					// Conversation: proto.String("Hello, World!"),
-					Conversation: proto.String("halo " + v.Info.PushName + ", ngapain kamu bilang " + textwa + " ?"),
-				})
+			if !v.Info.IsGroup {
+				if strings.Contains(textwa, "ini") {
+					client.SendMessage(context.Background(), targetJID, &waProto.Message{
+						// Conversation: proto.String("Hello, World!"),
+						Conversation: proto.String("halo " + v.Info.PushName + ", apa ini ?"),
+					})
+				} else {
+
+					client.SendMessage(context.Background(), targetJID, &waProto.Message{
+						// Conversation: proto.String("Hello, World!"),
+						Conversation: proto.String("halo " + v.Info.PushName + ", ngapain kamu bilang " + textwa + " ?"),
+					})
+				}
+			}
+
+			if v.Info.IsGroup {
+				if v.Info.Chat.Server == "g.us" {
+					groupInfo, err := client.GetGroupInfo(v.Info.Chat)
+					fmt.Println("error GetGroupInfo : ", err)
+					fmt.Println("Nama Group : ", groupInfo.GroupName.Name)
+
+					groupJID := types.JID{
+						Server: groupInfo.JID.Server,
+						User:   groupInfo.JID.User,
+					}
+
+					namGrup := groupInfo.GroupName.Name
+
+					if namGrup == "Test" {
+						client.SendMessage(context.Background(), groupJID, &waProto.Message{
+							// Conversation: proto.String("Hello, World!"),
+							Conversation: proto.String("halo " + v.Info.PushName + ", apa ini ?"),
+						})
+					}
+				}
 			}
 
 		}
@@ -101,6 +129,7 @@ func main() {
 				// e.g. qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
 				// or just manually `echo 2@... | qrencode -t ansiutf8` in a terminal
 				fmt.Println("QR code:", evt.Code)
+				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
 			} else {
 				fmt.Println("Login event:", evt.Event)
 			}
