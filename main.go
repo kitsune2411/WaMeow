@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/mdp/qrterminal/v3"
@@ -20,9 +21,27 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
+
+	"github.com/jasonlvhit/gocron"
 )
 
 var client *whatsmeow.Client
+
+func sendMyCustomMessage() {
+	client.SendMessage(context.Background(), types.JID{
+		Server: "g.us",
+		User:   "120363285101047607",
+	},
+		&waProto.Message{
+			// Conversation: proto.String("Hello, World!"),
+			Conversation: proto.String("Hello, World!"),
+		})
+}
+
+func executeCronJob() {
+	gocron.Every(1).Day().At("14:02").Do(sendMyCustomMessage)
+	<-gocron.Start()
+}
 
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
@@ -85,6 +104,9 @@ func eventHandler(evt interface{}) {
 						User:   groupInfo.JID.User,
 					}
 
+					fmt.Println(" Group JID: ", groupJID.Server)
+					fmt.Println(" Group JID: ", groupJID.User)
+
 					namGrup := groupInfo.GroupName.Name
 
 					if namGrup == "Test" {
@@ -100,8 +122,9 @@ func eventHandler(evt interface{}) {
 	}
 }
 
-func main() {
-	dbLog := waLog.Stdout("Database", "DEBUG", true)
+func waMeow() {
+
+	dbLog := waLog.Stdout("Database", "DEBUG", false)
 	// Make sure you add appropriate DB connector imports, e.g. github.com/mattn/go-sqlite3 for SQLite
 	container, err := sqlstore.New("sqlite3", "file:gowa.db?_foreign_keys=on", dbLog)
 	if err != nil {
@@ -112,9 +135,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	clientLog := waLog.Stdout("Client", "DEBUG", true)
+	clientLog := waLog.Stdout("Client", "DEBUG", false)
 	client = whatsmeow.NewClient(deviceStore, clientLog)
 	client.AddEventHandler(eventHandler)
+
+	// run cron job to send message
+	go executeCronJob()
 
 	if client.Store.ID == nil {
 		// No ID stored, new login
@@ -142,10 +168,34 @@ func main() {
 		}
 	}
 
+}
+
+func main() {
+
+	router := gin.Default()
+
+	router.GET("/ping", func(c *gin.Context) {
+
+		c.JSON(200, gin.H{
+			"message": "pong",
+		})
+	})
+
+	waMeow()
+
+	router.GET("/send", func(c *gin.Context) {
+		sendMyCustomMessage()
+		c.JSON(200, gin.H{
+			"message": "send message",
+		})
+	})
+	router.Run(":8080")
+
 	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
 	client.Disconnect()
+
 }
